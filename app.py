@@ -1,6 +1,6 @@
 from flask import Flask, render_template, redirect, session, flash
-from models import connect_db, db, User
-from forms import RegisterForm, LoginForm
+from models import connect_db, db, User, Feedback
+from forms import RegisterForm, LoginForm, FeedbackForm
 
 app = Flask(__name__)
 app.app_context().push()
@@ -69,8 +69,50 @@ def logout():
 def user_detail(username):
     """Show info about a given user upon login"""
     user = User.query.get(username)
-    if "username" not in session:
+    if "username" not in session or username != session['username']:
         flash("You must be logged in to view!")
         return redirect("/login")
     else:
         return render_template("user_detail.html", user=user)
+    
+@app.route("/users/<username>/delete")
+def delete_user(username):
+    """Delete a user"""
+    if "username" not in session or username != session['username']:
+        flash("You must be logged in to view!")
+        return redirect("/login")
+    else:
+        user = User.query.get(username)
+        db.session.delete(user)
+        db.session.commit()
+        return redirect("/")
+
+@app.route("/users/<username>/feedback/add", methods=["GET", "POST"])
+def feedback_form(username):
+    """Show and submit feedback form"""
+    form = FeedbackForm()
+    if "username" not in session or username != session['username']:
+        flash("You must be logged in to view!")
+        return redirect("/login")
+    else:
+        if form.validate_on_submit():
+            title = form.title.data
+            content = form.content.data
+            feedback = Feedback(title=title, content=content, username=username)
+            db.session.add(feedback)
+            db.session.commit()
+            return redirect(f"/users/{username}")
+    return render_template("feedback_form.html", form=form)
+
+@app.route("/feedback/<feedback_id>/delete")
+def delete_feedback(feedback_id):
+    """Delete a piece of feedback"""
+    if "username" not in session or username != session['username']:
+        flash("You must be logged in to view!")
+        return redirect("/login")
+    else:
+        feedback = Feedback.query.get(feedback_id)
+        username = feedback.username
+        db.session.delete(feedback)
+        db.session.commit()
+        return redirect(f"/users/{username}")
